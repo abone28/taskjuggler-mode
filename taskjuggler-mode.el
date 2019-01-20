@@ -622,33 +622,30 @@ will be inserted.  Otherwise this function asks for the keyword to use
   (modify-syntax-entry ?\n ">" taskjuggler-mode-syntax-table))
 
 
-(defun taskjuggler-mode ()
+(define-derived-mode taskjuggler-mode prog-mode
+  "TaskJuggler"
   "Major mode for editing TaskJuggler input files.
 
 \\{taskjuggler-mode-map}"
-  (interactive)
-  (kill-all-local-variables)
+
+  :syntax-table taskjuggler-mode-syntax-table
+  ;:group  ; FIXME
+  :after-hook taskjuggler-mode-hook
 
   ;; comments, FIXME: how to support both # and /* ... */
-  (make-local-variable 'comment-start)
-  (make-local-variable 'comment-end)
-  (make-local-variable 'comment-start-skip)
+  (setq-local comment-start "# ")
+  (setq-local comment-end "")
+  (setq-local comment-start-skip "#+[ \t]*")
 
-  (setq comment-start "# "
-        comment-end ""
-        comment-start-skip "#+[ \t]*")
+  ;;(set (make-local-variable 'indent-line-function) 'taskjuggler-indent-line)
+  (setq-local indent-line-function 'taskjuggler-indent-line)
 
-  (set-syntax-table taskjuggler-mode-syntax-table)
-
-  (set (make-local-variable 'indent-line-function) 'taskjuggler-indent-line) 
   (use-local-map taskjuggler-mode-map)
-  ;; Setting up font-locking
-  (make-local-variable 'font-lock-defaults)
-  (setq font-lock-defaults '(taskjuggler-font-lock-keywords nil t nil nil))
 
-  (setq major-mode 'taskjuggler-mode)
-  (setq mode-name "TaskJuggler")
-  (run-hooks 'taskjuggler-mode-hook))
+  ;; Setting up Font Lock mode
+  (setq-local font-lock-defaults '(taskjuggler-font-lock-keywords nil t nil nil))
+  )
+
 
 (add-to-list 'auto-mode-alist '("\\.tjp\\'" . taskjuggler-mode))
 (add-to-list 'auto-mode-alist '("\\.tji\\'" . taskjuggler-mode))
