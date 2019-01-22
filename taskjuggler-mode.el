@@ -618,8 +618,16 @@ will be inserted.  Otherwise this function asks for the keyword to use
   ;; This is added so entity names with underscores can be more easily parsed
   (setq taskjuggler-mode-syntax-table (make-syntax-table))
   (modify-syntax-entry ?_ "w" taskjuggler-mode-syntax-table)
+  ;; Comment syntax for taskjuggler files allow 3 styles
+  ;;  see https://github.com/taskjuggler/TaskJuggler/blob/master/lib/taskjuggler/ProjectFileScanner.rb
+  ;; Shell-style comment char
   (modify-syntax-entry ?# "<" taskjuggler-mode-syntax-table)
-  (modify-syntax-entry ?\n ">" taskjuggler-mode-syntax-table))
+  ;; C++/C-style comment chars
+  (modify-syntax-entry ?/ ". 124" taskjuggler-mode-syntax-table)
+  (modify-syntax-entry ?* ". 23b" taskjuggler-mode-syntax-table)
+  ;; Comment ending all style single line comments
+  (modify-syntax-entry ?\n ">" taskjuggler-mode-syntax-table)
+  )
 
 
 (define-derived-mode taskjuggler-mode prog-mode
@@ -632,10 +640,12 @@ will be inserted.  Otherwise this function asks for the keyword to use
   ;:group  ; FIXME
   :after-hook taskjuggler-mode-hook
 
-  ;; comments, FIXME: how to support both # and /* ... */
+  ;; comments, also defined in syntax table
   (setq-local comment-start "# ")
   (setq-local comment-end "")
   (setq-local comment-start-skip "#+[ \t]*")
+  ;(setq-local comment-start-skip "\\(//+\\|#+\\|/\\*+\\)[[:space:]]*")
+  ;(setq-local comment-end-skip "[[:space:]]*\\**/")
 
   ;;(set (make-local-variable 'indent-line-function) 'taskjuggler-indent-line)
   (setq-local indent-line-function 'taskjuggler-indent-line)
