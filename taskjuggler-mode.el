@@ -54,7 +54,13 @@
 ;; * Highlighting of priority according to value
 ;; * Validation of dependencies
 
+(require 'smie)
+
 (defvar taskjuggler-mode-hook nil)
+
+;; FIXME: add custom support
+(defvar taskjuggler-indent-basic 2)
+
 
 (defconst taskjuggler-properties
   '("account"
@@ -230,47 +236,94 @@ Used when completing resources.")
    '("\\('\\w*'\\)" . font-lock-variable-name-face))
   "Default highlighting expressions for TASKJUG mode")
 
+;;
+;; SMIE based indentation
+;;
 
-;; Internals, Parser, etc
-(defun taskjuggler-indent-line ()
-  "Indent current line as taskjuggler code.
+(defconst taskjuggler-smie-grammar
+  (smie-prec2->grammar
+   (smie-bnf->prec2
+    '(
+      (props ("<KWD>" value)
+             ("<KWD>" value "{" props "}")
+             ("<LST>" attrs)
+             (props "<KWD>" value)
+             (props "<KWD>" value "{" props "}")
+             (props "<LST>" attrs)
+             )
+      (attrs (attr)
+             (attr "," attrs)
+             )
+      (attr  (value)
+             (value "{" props "}")
+             )
+      (value)
+      )
+    '((left "<KWD>" "<LST>"))
+    )))
 
-This function was taken from taskjug.el which shipped with 
-Taskjuggler 2.4.1.  Maybe it could be re-written to use
-`taskjuggler-parser'."
-  (interactive)
-  (beginning-of-line)
-  (if (bobp)
-      (indent-line-to 0)           ; First line is always non-indented
-    (let ((not-indented t) cur-indent)
-      (if (looking-at "^[ \t]*}") ; If the line we are looking at is the end of a block, then decrease the indentation
-          (progn
-            (save-excursion
-              (forward-line -1)
-              (if (looking-at "^.*{")
-                  (setq cur-indent (current-indentation)) ; Empty block, keep the same level
-                (setq cur-indent (- (current-indentation) tab-width))))
-            (if (< cur-indent 0) ; We can't indent past the left margin
-                (setq cur-indent 0)))
-        
-        (save-excursion
-          (while not-indented ; Iterate backwards until we find an indentation hint
-            (forward-line -1)
-            (if (looking-at "^.*}") ; This hint indicates that we need to indent at the level of the } token
-                (progn
-                  (setq cur-indent (current-indentation))
-                  (setq not-indented nil))
-              
-              (if (looking-at "^.*{") ;This hint indicates that we need to indent an extra level
-                  (progn
-                    (setq cur-indent (+ (current-indentation) tab-width)) ; Do the actual indenting
-                    (setq not-indented nil))
-                (if (bobp)
-                    (setq not-indented nil)))))))
-      
-      (if cur-indent
-          (indent-line-to cur-indent)
-        (indent-line-to 0))))) ; If we didn't see an indentation hint, then allow no indentation
+
+(defun taskjuggler-smie-rules (kind token)
+  (pcase (cons kind token)
+    (`(:elem . basic) taskjuggler-indent-basic)
+    (`(,_ . ",") (smie-rule-separator kind))
+    (`(:before . "{")
+     ;; reuse indentation of a first token to which "{" belongs to
+     ;; (for example, reuse indend of "resource" or "task" keyword)
+     (save-excursion
+       (let (res)
+         (while (null (setq res (smie-backward-sexp))))
+         (pcase (nth 2 res)
+           ("<KWD>"
+            (goto-char (cadr res))
+            (cons 'column (current-column)))
+           (","
+            (cons 'column (current-column)))
+           (_
+            nil)
+           )
+         )
+       )
+     )
+    (`(:list-intro . "<KWD>") t)
+    )
+  )
+
+
+(defconst taskjuggler-smie-token-hash nil)
+(defun taskjuggler--init-token-hash ()
+  (progn
+    (setq taskjuggler-smie-token-hash
+          (make-hash-table :test 'equal :weakness t))
+    (mapc (lambda (token)
+            (puthash token "<KWD>" taskjuggler-smie-token-hash))
+          (append taskjuggler-properties
+                  taskjuggler-attributes
+                  taskjuggler-reports
+                  taskjuggler-report-keywords
+                  taskjuggler-important
+                  taskjuggler-keywords-having-resource-arg
+                  ))
+    (mapc (lambda (token)
+            (puthash token "<LST>" taskjuggler-smie-token-hash))
+          '(
+            "columns"
+            "journalattributes"
+            ))
+    ))
+(taskjuggler--init-token-hash)
+
+
+(defun taskjuggler-smie-forward-token ()
+  (let ((token (smie-default-forward-token)))
+    (gethash token taskjuggler-smie-token-hash token)))
+
+(defun taskjuggler-smie-backward-token ()
+  (let ((token (smie-default-backward-token)))
+    (gethash token taskjuggler-smie-token-hash token)))
+
+
+;; Parser
 
 (defvar taskjuggler-tasks ()
   "A list of all tasks found in the buffer.
@@ -640,20 +693,22 @@ will be inserted.  Otherwise this function asks for the keyword to use
   ;:group  ; FIXME
   :after-hook taskjuggler-mode-hook
 
-  ;; comments, also defined in syntax table
+  ;; comment syntax is also defined in syntax table
   (setq-local comment-start "# ")
   (setq-local comment-end "")
   (setq-local comment-start-skip "#+[ \t]*")
   ;(setq-local comment-start-skip "\\(//+\\|#+\\|/\\*+\\)[[:space:]]*")
   ;(setq-local comment-end-skip "[[:space:]]*\\**/")
 
-  ;;(set (make-local-variable 'indent-line-function) 'taskjuggler-indent-line)
-  (setq-local indent-line-function 'taskjuggler-indent-line)
-
   (use-local-map taskjuggler-mode-map)
 
   ;; Setting up Font Lock mode
   (setq-local font-lock-defaults '(taskjuggler-font-lock-keywords nil t nil nil))
+
+  ;; Setup SMIE indentation engine
+  (smie-setup taskjuggler-smie-grammar #'taskjuggler-smie-rules
+              :forward-token 'taskjuggler-smie-forward-token
+              :backward-token 'taskjuggler-smie-backward-token)
   )
 
 
