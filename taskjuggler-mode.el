@@ -54,13 +54,15 @@
 ;; * Highlighting of priority according to value
 ;; * Validation of dependencies
 
+
 (require 'smie)
 
+
+(defgroup taskjuggler nil
+  "TaskJuggler mode."
+  :group 'languages)
+
 (defvar taskjuggler-mode-hook nil)
-
-;; FIXME: add custom support
-(defvar taskjuggler-indent-basic 2)
-
 
 (defconst taskjuggler-properties
   '("account"
@@ -237,8 +239,17 @@ Used when completing resources.")
   "Default highlighting expressions for TASKJUG mode")
 
 ;;
-;; SMIE based indentation
+;; SMIE based indentation engine
 ;;
+
+(defcustom taskjuggler-indent-basic 2
+  "Basic amount of indentation.
+Default is 2. Use smie-indent-basic when nil"
+  :type 'integer
+  :group 'taskjuggler
+  :safe (lambda (x) (and (integerp x) (> x 0)))
+  )
+
 
 (defconst taskjuggler-smie-grammar
   (smie-prec2->grammar
@@ -260,7 +271,8 @@ Used when completing resources.")
       (value)
       )
     '((left "<KWD>" "<LST>"))
-    )))
+    ))
+  )
 
 
 (defun taskjuggler-smie-rules (kind token)
