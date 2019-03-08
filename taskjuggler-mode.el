@@ -860,24 +860,35 @@ will be inserted.  Otherwise this function asks for the keyword to use
   (define-key taskjuggler-mode-map [(control c) (i) (r)] 'taskjuggler-insert-resource-def))
 
 ;; Syntax
-(defvar taskjuggler-mode-syntax-table  nil
+
+(defvar taskjuggler-mode-syntax-table
+  (let ((st (make-syntax-table)))
+    ;; This is added so entity names with underscores can be more easily parsed
+    (modify-syntax-entry ?_ "w"  st)
+    ;; Comments have three different syntaxes
+    (modify-syntax-entry ?#  "<" st)    ; shell-style comments
+    (modify-syntax-entry ?/ ". 124" st) ; C-style comments both
+    (modify-syntax-entry ?* ". 23b" st) ; singe- and multi-line
+    (modify-syntax-entry ?\n ">" st)    ; comment endings for
+    (modify-syntax-entry ?\r ">" st)    ; single-line styles
+    ;; Strings have three different syntaxes
+    ;; http://taskjuggler.org/tj3/manual/The_TaskJuggler_Syntax.html#STRING
+    (modify-syntax-entry ?\" "\"" st)   ; double quote strings
+    (modify-syntax-entry ?\' "\"" st)   ; single quote strings
+    ;; multiline strings syntax is too complex for syntax tables, so
+    ;; it is parsed with taskjuggler-syntax-propertize-function
+    st)
   "Syntax table to use for taskjuggler mode.")
 
-(if taskjuggler-mode-syntax-table
-    () ;; already set
-  ;; This is added so entity names with underscores can be more easily parsed
-  (setq taskjuggler-mode-syntax-table (make-syntax-table))
-  (modify-syntax-entry ?_ "w" taskjuggler-mode-syntax-table)
-  ;; Comment syntax for taskjuggler files allow 3 styles
-  ;;  see https://github.com/taskjuggler/TaskJuggler/blob/master/lib/taskjuggler/ProjectFileScanner.rb
-  ;; Shell-style comment char
-  (modify-syntax-entry ?# "<" taskjuggler-mode-syntax-table)
-  ;; C++/C-style comment chars
-  (modify-syntax-entry ?/ ". 124" taskjuggler-mode-syntax-table)
-  (modify-syntax-entry ?* ". 23b" taskjuggler-mode-syntax-table)
-  ;; Comment ending all style single line comments
-  (modify-syntax-entry ?\n ">" taskjuggler-mode-syntax-table)
-  )
+(defconst taskjuggler-syntax-propertize-function
+  (syntax-propertize-rules
+   ("\\(-\\)8<-\n\\(.*\n\\)*?[ \t]*->8\\(-\\)"
+    (1 "|")
+    (3 "|")
+    ;; (0 (ignore (put-text-property (match-beginning 0) (match-end 0)
+    ;;                               'syntax-multiline t))))
+    )
+   ))
 
 
 (define-derived-mode taskjuggler-mode prog-mode
@@ -890,12 +901,14 @@ will be inserted.  Otherwise this function asks for the keyword to use
   ;:group  ; FIXME
   :after-hook taskjuggler-mode-hook
 
-  ;; comment syntax is also defined in syntax table
+  (setq-local syntax-propertize-function
+              taskjuggler-syntax-propertize-function)
+
+  ;; comment syntax is defined in syntax table
   (setq-local comment-start "# ")
+  (setq-local comment-start-skip "\\(//+\\|#+\\|/\\*+\\)[[:space:]]*")
   (setq-local comment-end "")
-  (setq-local comment-start-skip "#+[ \t]*")
-  ;(setq-local comment-start-skip "\\(//+\\|#+\\|/\\*+\\)[[:space:]]*")
-  ;(setq-local comment-end-skip "[[:space:]]*\\**/")
+  ;;(setq-local comment-end-skip "[[:space:]]*\\**/")
 
   (use-local-map taskjuggler-mode-map)
 
