@@ -279,7 +279,7 @@ Default is 2. Use smie-indent-basic when nil"
   (pcase (cons kind token)
     (`(:elem . basic) taskjuggler-indent-basic)
     (`(,_ . ",") (smie-rule-separator kind))
-    (`(:before . "{")
+    (`(:before . ,(or "{" "["))
      ;; reuse indentation of a first token to which "{" belongs to
      ;; (for example, reuse indend of "resource" or "task" keyword)
      (save-excursion
