@@ -880,15 +880,34 @@ will be inserted.  Otherwise this function asks for the keyword to use
     st)
   "Syntax table to use for taskjuggler mode.")
 
-(defconst taskjuggler-syntax-propertize-function
-  (syntax-propertize-rules
-   ("\\(-\\)8<-\n\\(.*\n\\)*?[ \t]*->8\\(-\\)"
-    (1 "|")
-    (3 "|")
-    ;; (0 (ignore (put-text-property (match-beginning 0) (match-end 0)
-    ;;                               'syntax-multiline t))))
-    )
-   ))
+
+(defun taskjuggler-syntax-propertize-function (start end)
+  (goto-char start)
+  (while (and (< (point) end)
+              (re-search-forward "\\(-\\)8<-$\\|^\\s *->8\\(-\\)" end t))
+    (cond
+     ((match-beginning 1)
+      (save-excursion
+        (let ((ppss (syntax-ppss
+                     (1- (match-beginning 1)))))
+          ;; match -8<- only before end of line, but only outside
+          ;; strings and comments
+          (if (and (null (nth 3 ppss))
+                   (null (nth 4 ppss)))
+              (put-text-property
+               (match-beginning 1)
+               (match-end 1)
+               'syntax-table
+               '(15))))))
+     ((match-beginning 2)
+      (save-excursion
+        ;; match ->8- only inside generic string near bol
+        (if (eq t (nth 3 (syntax-ppss (1- (point)))))
+            (put-text-property
+             (match-beginning 2)
+             (match-end 2)
+             'syntax-table
+             '(15))))))))
 
 
 (define-derived-mode taskjuggler-mode prog-mode
@@ -902,7 +921,7 @@ will be inserted.  Otherwise this function asks for the keyword to use
   :after-hook taskjuggler-mode-hook
 
   (setq-local syntax-propertize-function
-              taskjuggler-syntax-propertize-function)
+              #'taskjuggler-syntax-propertize-function)
 
   ;; comment syntax is defined in syntax table
   (setq-local comment-start "# ")
