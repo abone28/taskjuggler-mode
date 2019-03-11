@@ -55,6 +55,7 @@
 ;; * Validation of dependencies
 
 
+(require 'newcomment)
 (require 'smie)
 
 
@@ -864,19 +865,19 @@ will be inserted.  Otherwise this function asks for the keyword to use
 (defvar taskjuggler-mode-syntax-table
   (let ((st (make-syntax-table)))
     ;; This is added so entity names with underscores can be more easily parsed
-    (modify-syntax-entry ?_ "w"  st)
+    (modify-syntax-entry ?_  "w"     st)
     ;; Comments have three different syntaxes
-    (modify-syntax-entry ?#  "<" st)    ; shell-style comments
-    (modify-syntax-entry ?/ ". 124" st) ; C-style comments both
-    (modify-syntax-entry ?* ". 23b" st) ; singe- and multi-line
-    (modify-syntax-entry ?\n ">" st)    ; comment endings for
-    (modify-syntax-entry ?\r ">" st)    ; single-line styles
+    (modify-syntax-entry ?#  "<"     st) ; shell-style comments
+    (modify-syntax-entry ?/  ". 124" st) ; C-style comments both
+    (modify-syntax-entry ?*  ". 23b" st) ; singe- and multi-line
+    (modify-syntax-entry ?\n ">"     st) ; comment endings for
+    (modify-syntax-entry ?\r ">"     st) ; single-line styles
     ;; Strings have three different syntaxes
     ;; http://taskjuggler.org/tj3/manual/The_TaskJuggler_Syntax.html#STRING
-    (modify-syntax-entry ?\" "\"" st)   ; double quote strings
-    (modify-syntax-entry ?\' "\"" st)   ; single quote strings
+    (modify-syntax-entry ?\" "\""    st) ; double quote strings
+    (modify-syntax-entry ?\' "\""    st) ; single quote strings
     ;; multiline strings syntax is too complex for syntax tables, so
-    ;; it is parsed with taskjuggler-syntax-propertize-function
+    ;; they are parsed with taskjuggler-syntax-propertize-function
     st)
   "Syntax table to use for taskjuggler mode.")
 
@@ -923,10 +924,16 @@ will be inserted.  Otherwise this function asks for the keyword to use
   (setq-local syntax-propertize-function
               #'taskjuggler-syntax-propertize-function)
 
-  ;; comment syntax is defined in syntax table
+  ;; configure newcomment module
   (setq-local comment-start "# ")
-  (setq-local comment-start-skip "\\(//+\\|#+\\|/\\*+\\)[[:space:]]*")
   (setq-local comment-end "")
+  ;; comment chars are defined in syntax table, but syntax table cannot
+  ;; be used for constructing comment-start-skip regexp
+  (setq-local comment-use-syntax nil)
+  ;; NOTE: smie-indent-fixindent may handle all C-style comments as
+  ;; fixindent comments because of bug #34805.
+  ;; http://lists.gnu.org/archive/html/bug-gnu-emacs/2019-03/msg00301.html
+  (setq-local comment-start-skip "//+\\s *\\|/\\*+\\s *\\|#+\\s *")
   ;;(setq-local comment-end-skip "[[:space:]]*\\**/")
 
   (use-local-map taskjuggler-mode-map)
